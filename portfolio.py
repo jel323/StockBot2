@@ -7,6 +7,7 @@ class Portfolio:
     def __init__(
         self,
         start_val,
+        stock_tickers,
         days,
         forcast,
         nstocks,
@@ -17,6 +18,7 @@ class Portfolio:
         plotp=True,
     ):
         self.start_val = start_val
+        self.stock_tickers = np.array(stock_tickers)
         self.days = days
         self.day = 0
         self.forcast = forcast
@@ -306,3 +308,11 @@ class Portfolio:
         return self.getvalue(self.day), (
             self.getvalue(self.day) / self.getvalue(self.day - 1)
         )
+
+    def printtrades(self):
+        ind = self.n[self.day - 1] > 0
+        trades_n = self.n[self.day - 1, ind]
+        trades_stock = self.stock_tickers[ind]
+        for k in range(trades_n.shape[0]):
+            print(f"Ticker - {trades_stock[k]}, # Stocks - {trades_n[k]}")
+        return

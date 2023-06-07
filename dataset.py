@@ -2,6 +2,10 @@ import numpy as np
 import os
 import sys
 
+import robin_stocks.robinhood as rh
+
+login = rh.login("idm@ianmackey.net", "swimEng97!")
+
 path = sys.path[0]
 bpath = path[0 : path.rfind(os.path.sep)]
 sys.path.append(bpath)
@@ -25,6 +29,25 @@ def normalize(item):
     return mins, spreads, means
 
 
+def getsptickers(sp_file):
+    with open(sp_file, "r") as f:
+        lines = f.read()
+    lines = lines.split("\n")
+    lines = [line.split(",") for line in lines]
+    tickers = [line[0].lower() for line in lines[1:]]
+    return tickers
+
+
+def readrh_dict(cdict):
+    vals = np.empty((5))
+    vals[0] = cdict["open_price"]
+    vals[1] = cdict["high_price"]
+    vals[2] = cdict["low_price"]
+    vals[3] = cdict["close_price"]
+    vals[4] = cdict["volume"]
+    return vals
+
+
 class SP_N:
     def __init__(
         self,
@@ -37,11 +60,7 @@ class SP_N:
         # These stocks are naturally sorted by market cap
         self.dataroot = dataroot
         self.start_date = np.datetime64(start_date)
-        with open(sp_file, "r") as f:
-            lines = f.read()
-        lines = lines.split("\n")
-        lines = [line.split(",") for line in lines]
-        self.tickers = [line[0].lower() for line in lines[1:]]
+        self.tickers = getsptickers(sp_file)
         self.stocks = np.array(
             [
                 ticker + ".us.txt"
@@ -160,3 +179,53 @@ class SP_N:
             return stock_tensors, all_mins, all_spreads, all_means
         else:
             return stock_tensors
+
+
+def getstockdata(tickers: list, span="5year", interval="day"):
+    nstocks = len(tickers)
+    vdata = rh.get_stock_historicals(tickers, span=span, interval=interval)
+    """if len(vdata) % nstocks != 0:
+        raise Exception("Not All Stocks Fill Full 5 years")"""
+    ndays = len(vdata) // nstocks
+    sdata = np.empty((nstocks, ndays, 5))
+    counters = np.zeros(nstocks, dtype=int)
+    for i in range(len(vdata)):
+        cdict = vdata[i]
+        tick = vdata[i]["symbol"]
+        tick_idx = tickers.index(tick)
+
+        sdata[tick_idx, counters[tick_idx]] = readrh_dict(cdict)
+        counters[tick_idx] += 1
+
+    if ((counters != counters[0]).sum() > 0) and counters[0] == ndays:
+        raise Exception("ur wrong")
+    return sdata
+
+
+def upperlst(tickers):
+    for k in range(len(tickers)):
+        tickers[k] = tickers[k].upper()
+    return tickers
+
+
+class SP_rh:
+    def __init__(self, nstocks, sp_file="SP500_Index.csv"):
+        self.tickers = upperlst(getsptickers(sp_file)[:nstocks])
+        self.stockdata = getstockdata(self.tickers)
+        return
+
+    def days(self):
+        return self.stockdata.shape[1]
+
+    def __len__(self):
+        return len(self.tickers)
+
+    def __getitem__(self, idx):
+        self.stockdata[idx]
+        return
+
+    def getall(self):
+        return self.stockdata
+
+    def gettickers(self):
+        return self.tickers
