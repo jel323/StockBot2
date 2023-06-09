@@ -6,16 +6,16 @@ import matplotlib.pyplot as plt
 class Portfolio:
     def __init__(
         self,
-        start_val,
-        stock_tickers,
-        days,
-        forcast,
-        nstocks,
-        cov,
-        risk_free,
-        init_prices,
-        gamma=0.002,
-        plotp=True,
+        start_val: float,
+        stock_tickers: list,
+        days: int,
+        forcast: int,
+        nstocks: int,
+        cov: np.ndarray,
+        risk_free: float,
+        init_prices: np.ndarray,
+        gamma=300.0,
+        plotp=False,
     ):
         self.start_val = start_val
         self.stock_tickers = np.array(stock_tickers)
@@ -26,7 +26,7 @@ class Portfolio:
         self.risk_free = risk_free
         self.gamma = gamma
         self.plotp = plotp
-        self.fixsig(cov)
+        self.getsig(cov)
         self.h = np.zeros((days + 1, nstocks + 1))
         self.h[0, -1] = start_val
         self.hp = np.zeros((days, nstocks + 1))
@@ -44,22 +44,22 @@ class Portfolio:
         self.maxdret = np.zeros((days,))
         return
 
-    def getvalue(self, day):
+    def getvalue(self, day: int):
         return self.h[day].sum()
 
-    def getposttradevalue(self, day):
+    def getposttradevalue(self, day: int):
         return self.hp[day].sum()
 
-    def getweights(self, day):
+    def getweights(self, day: int):
         return self.h[day] / self.getvalue(day)
 
-    def grossexposure(self, day):
+    def grossexposure(self, day: int):
         return np.sum(np.abs(self.h[day, :-1]))
 
-    def leverage(self, day):
+    def leverage(self, day: int):
         return self.grossexposure(day) / self.getvalue(day)
 
-    def turnover(self, day):
+    def turnover(self, day: int):
         return np.sum(np.abs(self.u[day, :-1])) / (2 * self.getvalue(day))
 
     def transactioncost(self, val):
@@ -75,10 +75,9 @@ class Portfolio:
         sig[:-1, :-1] = sigr
         return sig
 
-    def fixsig(self, cov):
-        sig = np.zeros((self.nstocks + 1, self.nstocks + 1))
-        sig[:-1, :-1] = cov
-        self.sig = sig
+    def getsig(self, cov):
+        self.sig = np.zeros((self.nstocks + 1, self.nstocks + 1))
+        self.sig[:-1, :-1] = cov
         return
 
     def calctradesingle(self, plot=True):
@@ -137,7 +136,7 @@ class Portfolio:
             plt.show()
         return
 
-    def calctrademulti(self, dropout, plot=True):
+    def calctrademulti(self, dropout: float, plot=True):
         self.returnestimates[0, :-1] = (
             self.priceestimates[0] - self.prices[self.day]
         ) / self.prices[self.day]
@@ -180,7 +179,7 @@ class Portfolio:
             print(f"Return Matrix - {self.returnestimates @ z.value}")
         return
 
-    def roundp(self, n):
+    def roundp(self, n: np.ndarray):
         indp = np.where(n >= 0)
         indn = np.where(n < 0)
         n[indp] = np.floor(n[indp])
@@ -204,14 +203,14 @@ class Portfolio:
         self.z[self.day] = nz
         return
 
-    def maketrades(self, intt):
+    def maketrades(self, intt: bool):
         if intt:
             self.inttrades()
         self.u[self.day] = self.z[self.day] * self.getvalue(self.day)
         self.hp[self.day] = self.h[self.day] + self.u[self.day]
         return
 
-    def eststats(self, day):
+    def eststats(self, day: int):
         estvalv = (
             np.diag(
                 np.ones(
@@ -221,7 +220,7 @@ class Portfolio:
             )
             @ self.hp[self.day - 1]
         )
-        print(f"Estimate Value at t={day} - {estvalv.sum()}")
+        print(f"Estimate Value at t={day} - {np.round(estvalv.sum(), 3)}")
         return
 
     def countn(self):
@@ -241,17 +240,19 @@ class Portfolio:
             raise
         return
 
-    def truestats(self, day):
-        print(f"Value at  - {self.getvalue(self.day)}")
+    def truestats(self, day: int):
+        print(f"Value at  - {np.round(self.getvalue(self.day), 3)}")
         print(
-            f"Daily Return - {100 * self.getvalue(self.day) / self.getvalue(self.day - 1) - 100}%"
+            f"Daily Return - {np.round(100 * self.getvalue(self.day) / self.getvalue(self.day - 1) - 100, 3)}%"
         )
-        print(f"Total Return - {100 * self.getvalue(self.day) / self.start_val - 100}%")
-        print(f"Max Daily Return - {self.maxdret[self.day - 1] * 100}%")
+        print(
+            f"Total Return - {np.round(100 * self.getvalue(self.day) / self.start_val - 100, 3)}%"
+        )
+        print(f"Max Daily Return - {np.round(self.maxdret[self.day - 1] * 100, 3)}%")
         self.countn()
-        print(f"Gross Exposure - {self.grossexposure(self.day)}")
-        print(f"Leverage at - {self.leverage(self.day)}")
-        print(f"Turnover at - {self.turnover(day - 1)}")
+        print(f"Gross Exposure - {np.round(self.grossexposure(self.day), 3)}")
+        print(f"Leverage at - {np.round(self.leverage(self.day), 3)}")
+        print(f"Turnover at - {np.round(self.turnover(day - 1), 3)}")
         return
 
     def testmulti(self):
@@ -265,7 +266,7 @@ class Portfolio:
         print(f"Returns - {(returns + 1) @ (z.T + w.T)}")
         return
 
-    def trade(self, new_prices_est, plot=True, intt=True, dropout=1):
+    def trade(self, new_prices_est: np.ndarray, plot=True, intt=True, dropout=1):
         print(f"Day {self.day} - Optimization")
         self.priceestimates = new_prices_est
         if self.forcast == 1:

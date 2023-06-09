@@ -4,7 +4,7 @@ import sys
 
 import robin_stocks.robinhood as rh
 
-login = rh.login("idm@ianmackey.net", "swimEng97!")
+# login = rh.login("idm@ianmackey.net", "swimEng97!")
 
 path = sys.path[0]
 bpath = path[0 : path.rfind(os.path.sep)]
@@ -46,6 +46,13 @@ def readrh_dict(cdict):
     vals[3] = cdict["close_price"]
     vals[4] = cdict["volume"]
     return vals
+
+
+def returns(data):
+    ret = np.zeros((data.shape[0], data.shape[1] - 1))
+    for k in range(data.shape[0]):
+        ret[k] = data[k, 1:] / data[k, :-1]
+    return ret
 
 
 class SP_N:
@@ -131,7 +138,16 @@ class SP_N:
         data[:, 4] = lines[self.inds[idx] : self.inds[idx] + self.size, 5].astype(
             np.float32
         )
-        return data, dates
+        return data
+
+    def getdata(self, nstocks):
+        out = np.empty((nstocks, self.size, 5))
+        for k in range(nstocks):
+            out[k] = self[k]
+        return out
+
+    def gettickers(self, nstocks):
+        return self.tickers[:nstocks]
 
     def __getitem2__(self, index):
         sp_stocks = self.stocks[(self.idxs[1:-1] + index) % len(self.stocks)]
@@ -202,6 +218,22 @@ def getstockdata(tickers: list, span="5year", interval="day"):
     return sdata
 
 
+def getdailydata(rh_data):
+    n_points = len(rh_data)
+    data_arr = np.empty((n_points, 5))
+    for k in range(n_points):
+        data_arr[k] = readrh_dict(rh_data[k])
+    return np.array(
+        [
+            data_arr[0, 0],
+            data_arr[:, 1].max(),
+            data_arr[:, 2].min(),
+            data_arr[-1, 3],
+            data_arr[:, 4].sum(),
+        ]
+    )
+
+
 def upperlst(tickers):
     for k in range(len(tickers)):
         tickers[k] = tickers[k].upper()
@@ -212,6 +244,7 @@ class SP_rh:
     def __init__(self, nstocks, sp_file="SP500_Index.csv"):
         self.tickers = upperlst(getsptickers(sp_file)[:nstocks])
         self.stockdata = getstockdata(self.tickers)
+        self.addtoday()
         return
 
     def days(self):
@@ -229,3 +262,27 @@ class SP_rh:
 
     def gettickers(self):
         return self.tickers
+
+    def getcov(self):
+        return np.cov(returns(self.stockdata[:, -41:, 3]))
+
+    def addtoday(self):
+        stock_data = np.empty((len(self), self.days() + 1, 5))
+        stock_data[:, :-1, :] = self.stockdata
+        daydata = getstockdata(self.tickers, "day", "5minute")
+        daydata = np.array(
+            [
+                daydata[:, 0, 0],
+                daydata[:, :, 1].max(axis=1),
+                daydata[:, :, 2].min(axis=1),
+                daydata[:, -1, 3],
+                daydata[:, :, 4].sum(axis=1),
+            ]
+        ).T
+        stock_data[:, -1, :] = daydata
+        self.stockdata = stock_data
+        return
+
+    def gettoday(self):
+        self.addtoday()
+        return self.stockdata[:, -1, :]
