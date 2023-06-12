@@ -4,7 +4,7 @@ import sys
 
 import robin_stocks.robinhood as rh
 
-# login = rh.login("idm@ianmackey.net", "swimEng97!")
+login = rh.login("idm@ianmackey.net", "swimEng97!")
 
 path = sys.path[0]
 bpath = path[0 : path.rfind(os.path.sep)]
