@@ -236,7 +236,7 @@ class SP_rh:
     def __init__(self, nstocks, sp_file="SP500_Index.csv"):
         self.tickers = upperlst(getsptickers(sp_file)[:nstocks])
         self.stockdata = getstockdata(self.tickers)
-        self.addtoday()
+        # self.addtoday()
         return
 
     def days(self):
