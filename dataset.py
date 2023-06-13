@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import sys
-
+import torch
 import robin_stocks.robinhood as rh
 
 login = rh.login("idm@ianmackey.net", "swimEng97!")
@@ -199,23 +199,15 @@ class SP_N:
 
 def getstockdata(tickers: list, span="5year", interval="day"):
     nstocks = len(tickers)
-    vdata = rh.get_stock_historicals(tickers, span=span, interval=interval)
-    """if len(vdata) % nstocks != 0:
-        raise Exception("Not All Stocks Fill Full 5 years")"""
-    ndays = len(vdata) // nstocks
-    sdata = np.empty((nstocks, ndays, 5))
-    counters = np.zeros(nstocks, dtype=int)
-    for i in range(len(vdata)):
-        cdict = vdata[i]
-        tick = vdata[i]["symbol"]
-        tick_idx = tickers.index(tick)
-
-        sdata[tick_idx, counters[tick_idx]] = readrh_dict(cdict)
-        counters[tick_idx] += 1
-
-    if ((counters != counters[0]).sum() > 0) and counters[0] == ndays:
-        raise Exception("ur wrong")
-    return sdata
+    stock1 = rh.get_stock_historicals(tickers[0], span=span, interval=interval)
+    vdata = torch.zeros((nstocks, len(stock1), 5), dtype=torch.float32)
+    lengths = torch.empty((nstocks,), dtype=torch.float32)
+    for k, ticker in enumerate(tickers):
+        tick_data = rh.get_stock_historicals(ticker, span=span, interval=interval)
+        tick_tensor = torch.from_numpy(getdailydata(tick_data))
+        lengths[k] = tick_tensor.size(0)
+        vdata[k, : lengths[k]] = tick_tensor
+    return torch.nn.utils.rnn.pack_padded_sequence(vdata, lengths)
 
 
 def getdailydata(rh_data):
@@ -254,8 +246,7 @@ class SP_rh:
         return len(self.tickers)
 
     def __getitem__(self, idx):
-        self.stockdata[idx]
-        return
+        return self.stockdata[idx]
 
     def getall(self):
         return self.stockdata
