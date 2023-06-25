@@ -4,7 +4,7 @@ import sys
 import torch
 import robin_stocks.robinhood as rh
 
-login = rh.login("idm@ianmackey.net", "swimEng97!")
+# login = rh.login("idm@ianmackey.net", "swimEng97!")
 
 path = sys.path[0]
 bpath = path[0 : path.rfind(os.path.sep)]
@@ -53,6 +53,40 @@ def returns(data):
     for k in range(data.shape[0]):
         ret[k] = data[k, 1:] / data[k, :-1]
     return ret
+
+
+def gettrainingdata_np(data, n_after, n_before, get_out=True):
+    """
+    Used for creating training data
+    """
+    n = n_after + n_before
+    inp = np.empty((data.shape[0] - n + 1, n_before * 4))
+    for k in range(inp.shape[0]):
+        inp[k] = data[k : k + n_before, :-1].flatten()
+
+    if get_out:
+        outd = np.empty((inp.shape[0], n_after))
+        for k in range(inp.shape[0]):
+            outd[k] = data[k + n_before : k + n, 3]
+        return inp, outd
+    return inp
+
+
+def gettrainingdata_torch(data, n_after, n_before, get_out=True):
+    """
+    Used for creating training data
+    """
+    n = n_after + n_before
+    inp = torch.zeros((data.size(0) - n + 1, n_before * 4))
+    for k in range(inp.size(0)):
+        inp[k] = data[k : k + n_before, :-1].flatten()
+
+    if get_out:
+        outd = torch.empty((inp.size(0), n_after))
+        for k in range(inp.size(0)):
+            outd[k] = data[k + n_before : k + n, 3]
+        return inp, outd
+    return inp
 
 
 class SP_N:
@@ -277,3 +311,25 @@ class SP_rh:
     def gettoday(self):
         self.addtoday()
         return self.stockdata[:, -1, :]
+
+
+class SimpleDataset(torch.utils.data.Dataset):
+    def __init__(self, training_data, n_after, n_before):
+        self.trainingdata = torch.from_numpy(training_data).float()
+        self.inputs, self.outputs = gettrainingdata_torch(
+            self.trainingdata, n_after, n_before, True
+        )
+        return
+
+    def __len__(self):
+        return self.inputs.size(0)
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.outputs[idx]
+
+
+def make_both(data, n_after, n_before, n_testing):
+    return (
+        SimpleDataset(data[:-n_testing], n_after, n_before),
+        SimpleDataset(data[-n_testing:], n_after, n_before),
+    )
